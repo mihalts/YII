@@ -7,6 +7,32 @@ use yii\helpers\FileHelper;
 
 class ParserController extends Controller
 {
+    public function actionIndex()
+    {
+        $availableDbs = ['db1', 'db2', 'db3', 'db4'];
+
+        $selectedDb = Yii::$app->request->get('db', 'all');
+
+        return $this->render('index', [
+           'availableDbs' => $availableDbs,
+           'selectedDb' => $selectedDb,
+        ]);
+    }
+
+    public function actionExportXml($db = 'all')
+    {
+        $databases = ($db === 'all') ? ['db1', 'db2', 'db3', 'db4'] : [$db];
+
+        foreach ($databases as $dbname) {
+            // Виклик сервісу або логіки експорту для кожної БД
+            Yii::info("Експортуємо XML з $dbname");
+        }
+
+        Yii::$app->session->setFlash('success', 'Експорт завершено.');
+
+        return $this->redirect(['parser/index', 'db' => $db]);
+    }
+
     public function actionList()
     {
         $path = \Yii::getAlias("@app/../storage/mysql-dumps");
