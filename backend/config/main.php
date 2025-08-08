@@ -37,6 +37,15 @@ return [
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
+        'parser' => [
+            'class' => 'backend\components\ParserComponent',
+        ],
+        'export' => [
+            'class' => 'backend\components\ExportComponent',
+        ],
+        'cache' => [
+            'class' => 'yii\caching\FileCache',
+        ],
         /*
         'urlManager' => [
             'enablePrettyUrl' => true,

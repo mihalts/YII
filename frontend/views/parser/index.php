@@ -9,6 +9,10 @@ use yii\widgets\ActiveForm;
 
 <h2>Експорт новин з бази даних</h2>
 
+<?= Html::a('Export XML', ['parser/export', 'db' => $selectedDb, 'format' => 'xml']) ?>
+<?= Html::a('Export CSV', ['parser/export', 'db' => $selectedDb, 'format' => 'csv']) ?>
+<?= Html::a('Export TXT', ['parser/export', 'db' => $selectedDb, 'format' => 'txt']) ?>
+
 <?php $form = ActiveForm::begin([
     'method' => 'get',
     'action' => Url::to(['parser/index']),

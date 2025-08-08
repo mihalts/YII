@@ -4,6 +4,7 @@ namespace console\controllers;
 
 use yii\console\Controller;
 use yii\helpers\FileHelper;
+use common\components\ExportService;
 
 class ParserController extends Controller
 {
@@ -72,6 +73,34 @@ class ParserController extends Controller
 
         echo "Exported to $filename" . PHP_EOL;
         return Controller::EXIT_CODE_NORMAL;
+    }
+
+    public function actionExport($db, $format = 'xml')
+    {
+        // ... (ініціалізація підключення та вибір постів)
+
+        $posts = (new \yii\db\Query())
+            ->select(['post_title AS title', 'post_content AS content'])
+            ->from('wp_posts')
+            ->where(['post_type' => 'post'])
+            ->all($dbConn);
+
+        $filename = 'export_' . $db . '_' . date('Ymd_His') . '.' . $format;
+        $exportPath = \Yii::getAlias('@app/runtime/exports/' . $filename);
+
+        switch ($format) {
+            case 'csv':
+                ExportService::exportCSV($posts, $exportPath);
+                break;
+            case 'txt':
+                ExportService::exportTXT($posts, $exportPath);
+                break;
+            case 'xml':
+            default:
+                self::exportXML($posts, $exportPath);
+        }
+
+        return \Yii::$app->response->sendFile($exportPath);
     }
 }
 
