@@ -6,6 +6,7 @@ use Yii;
 use yii\base\Component;
 use yii\helpers\HtmlPurifier;
 use PDO;
+use yii\web\UploadedFile;
 
 class ParserComponent extends Component
 {
@@ -111,4 +112,52 @@ class ParserComponent extends Component
 
         return null;
     }
+
+    public function actionDelete($file)
+    {
+        $filePath = Yii::getAlias('@storage/databases/' . $file);
+
+        if (!preg_match('/\.sql$/', $file)) {
+            Yii::$app->session->setFlash('error', 'Недопустиме розширення файлу.');
+            return $this->redirect(['index']);
+        }
+
+        if (file_exists($filePath)) {
+            if (@unlink($filePath)) {
+                Yii::$app->session->setFlash('success', "Файл '$file' успішно видалено.");
+            } else {
+                Yii::$app->session->setFlash('error', "Не вдалося видалити файл '$file'.");
+            }
+        } else {
+            Yii::$app->session->setFlash('error', "Файл '$file' не знайдено.");
+        }
+
+        return $this->redirect(['index']);
+    }
+
+    public function actionUpload()
+    {
+        $uploadedFile = UploadedFile::getInstanceByName('sqlFile');
+
+        if (!$uploadedFile) {
+            Yii::$app->session->setFlash('error', 'Файл не вибрано.');
+            return $this->redirect(['index']);
+        }
+
+        if ($uploadedFile->extension !== 'sql') {
+            Yii::$app->session->setFlash('error', 'Дозволено лише .sql файли.');
+            return $this->redirect(['index']);
+        }
+
+        $targetPath = Yii::getAlias('@storage/databases/' . $uploadedFile->name);
+
+        if ($uploadedFile->saveAs($targetPath)) {
+            Yii::$app->session->setFlash('success', 'Файл успішно завантажено.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Помилка при збереженні файлу.');
+        }
+
+        return $this->redirect(['index']);
+    }
+
 }

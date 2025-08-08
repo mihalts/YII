@@ -17,6 +17,12 @@ $this->title = 'Експорт новин із баз даних';
     </div>
 <?php endif; ?>
 
+<?php if (Yii::$app->session->hasFlash('success')): ?>
+    <div class="alert alert-success">
+        <?= Yii::$app->session->getFlash('success') ?>
+    </div>
+<?php endif; ?>
+
 <?php if (empty($databases)): ?>
     <p><em>Бази даних не знайдено.</em></p>
 <?php else: ?>
@@ -27,11 +33,21 @@ $this->title = 'Експорт новин із баз даних';
 
     <div class="form-group">
         <label>Оберіть бази даних:</label><br>
+
         <?php foreach ($databases as $file): ?>
-            <label>
-                <?= Html::checkbox('selectedDatabases[]', false, ['value' => $file]) ?>
-                <?= Html::encode($file) ?>
-            </label><br>
+            <div class="d-flex align-items-center mb-2">
+                <label style="margin-right: 10px;">
+                    <?= Html::checkbox('selectedDatabases[]', false, ['value' => $file]) ?>
+                    <?= Html::encode($file) ?>
+                </label>
+
+                <?= Html::a('❌ Видалити', ['parser/delete', 'file' => $file], [
+                    'class' => 'btn btn-danger btn-sm',
+                    'data-confirm' => 'Ви впевнені, що хочете видалити цей файл?',
+                    'data-method' => 'post',
+                    'style' => 'margin-left: 10px;',
+                ]) ?>
+            </div>
         <?php endforeach; ?>
     </div>
 
@@ -41,8 +57,26 @@ $this->title = 'Експорт новин із баз даних';
         <?= Html::submitButton('Експортувати у TXT', ['class' => 'btn btn-primary', 'name' => 'action', 'value' => 'txt']) ?>
         <?= Html::submitButton('Export to XML', ['name' => 'action', 'value' => 'xml', 'class' => 'btn btn-outline-secondary']) ?>
         <?= Html::submitButton('Export to XML (merge)', ['name' => 'action', 'value' => 'xml-merge', 'class' => 'btn btn-outline-warning']) ?>
-
     </div>
 
     <?php ActiveForm::end(); ?>
 <?php endif; ?>
+
+<hr>
+<h3>Додати новий SQL-файл</h3>
+
+<?php $uploadForm = ActiveForm::begin([
+    'action' => ['parser/upload'],
+    'method' => 'post',
+    'options' => ['enctype' => 'multipart/form-data'],
+]); ?>
+
+<div class="form-group">
+    <?= Html::fileInput('sqlFile', null, ['accept' => '.sql']) ?>
+</div>
+
+<div class="form-group">
+    <?= Html::submitButton('Завантажити', ['class' => 'btn btn-secondary']) ?>
+</div>
+
+<?php ActiveForm::end(); ?>
