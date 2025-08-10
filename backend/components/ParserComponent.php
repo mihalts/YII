@@ -5,8 +5,9 @@ namespace backend\components;
 use Yii;
 use yii\base\Component;
 use yii\helpers\HtmlPurifier;
-use PDO;
+use yii\helpers\FileHelper;
 use yii\web\UploadedFile;
+use PDO;
 
 class ParserComponent extends Component
 {
@@ -16,13 +17,31 @@ class ParserComponent extends Component
     public $dbPort = '3306';
     protected $cacheDuration = 300; // seconds
 
+    /**
+     * Завантаження .sql файлу в @storage/databases без редіректів.
+     * Повертає true при успіху.
+     */
+    public function upload(): bool
+    {
+        $uploadedFile = UploadedFile::getInstanceByName('sqlFile');
+
+        if (!$uploadedFile || strtolower($uploadedFile->extension) !== 'sql') {
+            return false;
+        }
+
+        $dir = Yii::getAlias('@storage/databases');
+        FileHelper::createDirectory($dir);
+
+        return $uploadedFile->saveAs($dir . '/' . $uploadedFile->name);
+    }
+
     public function getNewsFromDatabase(string $dbName): array
     {
         $cacheKey = "news_{$dbName}";
         $cache = Yii::$app->cache;
 
-        if ($cache->exists($cacheKey)) {
-            return $cache->get($cacheKey);
+        if (($cached = $cache->get($cacheKey)) !== false) {
+            return $cached;
         }
 
         try {
@@ -112,52 +131,4 @@ class ParserComponent extends Component
 
         return null;
     }
-
-    public function actionDelete($file)
-    {
-        $filePath = Yii::getAlias('@storage/databases/' . $file);
-
-        if (!preg_match('/\.sql$/', $file)) {
-            Yii::$app->session->setFlash('error', 'Недопустиме розширення файлу.');
-            return $this->redirect(['index']);
-        }
-
-        if (file_exists($filePath)) {
-            if (@unlink($filePath)) {
-                Yii::$app->session->setFlash('success', "Файл '$file' успішно видалено.");
-            } else {
-                Yii::$app->session->setFlash('error', "Не вдалося видалити файл '$file'.");
-            }
-        } else {
-            Yii::$app->session->setFlash('error', "Файл '$file' не знайдено.");
-        }
-
-        return $this->redirect(['index']);
-    }
-
-    public function actionUpload()
-    {
-        $uploadedFile = UploadedFile::getInstanceByName('sqlFile');
-
-        if (!$uploadedFile) {
-            Yii::$app->session->setFlash('error', 'Файл не вибрано.');
-            return $this->redirect(['index']);
-        }
-
-        if ($uploadedFile->extension !== 'sql') {
-            Yii::$app->session->setFlash('error', 'Дозволено лише .sql файли.');
-            return $this->redirect(['index']);
-        }
-
-        $targetPath = Yii::getAlias('@storage/databases/' . $uploadedFile->name);
-
-        if ($uploadedFile->saveAs($targetPath)) {
-            Yii::$app->session->setFlash('success', 'Файл успішно завантажено.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Помилка при збереженні файлу.');
-        }
-
-        return $this->redirect(['index']);
-    }
-
 }
