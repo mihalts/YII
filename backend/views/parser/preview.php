@@ -1,35 +1,30 @@
 <?php
-
+/** @var array $result */
 use yii\helpers\Html;
 
-/** @var array $result */
-
-$this->title = 'Попередній перегляд новин';
+$this->title = 'Перегляд новин';
 ?>
-
 <h1><?= Html::encode($this->title) ?></h1>
 
 <?php if (empty($result)): ?>
-    <p><em>Дані відсутні.</em></p>
+  <p>Немає даних для перегляду.</p>
 <?php else: ?>
-    <?php foreach ($result as $dbName => $items): ?>
-        <h2><?= Html::encode($dbName) ?></h2>
-
-        <?php if (empty($items)): ?>
-            <p><em>Новини не знайдено.</em></p>
-        <?php else: ?>
-            <ul>
-                <?php foreach ($items as $news): ?>
-                    <li>
-                        <strong><?= Html::encode($news['title'] ?? '') ?></strong><br>
-                        <div><?= nl2br(Html::encode($news['text'] ?? '')) ?></div>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    <?php endforeach; ?>
+  <?php foreach ($result as $dbName => $newsList): ?>
+    <h3><?= Html::encode($dbName) ?></h3>
+    <?php if (empty($newsList)): ?>
+      <p><em>Порожньо</em></p>
+    <?php else: ?>
+      <ul>
+        <?php foreach ($newsList as $item): ?>
+          <li style="margin-bottom:10px;">
+            <strong><?= Html::encode($item['title'] ?? '') ?></strong><br>
+            <div><?= $item['text'] ?? '' ?></div>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+    <hr>
+  <?php endforeach; ?>
 <?php endif; ?>
 
-<p>
-    <?= Html::a('← Назад', ['index'], ['class' => 'btn btn-secondary']) ?>
-</p>
+<p><?= Html::a('← Назад', ['parser/index'], ['class' => 'btn btn-default']) ?></p>

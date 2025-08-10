@@ -13,15 +13,12 @@ class ExportService extends Component
         $filename = 'export_' . date('Y-m-d_H-i-s') . '.csv';
         Yii::$app->response->headers->set('Content-Type', 'text/csv');
         Yii::$app->response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
         $fh = fopen('php://output', 'w');
         fputcsv($fh, ['Database', 'Title', 'Text']);
         foreach ($result as $dbName => $newsList) {
             foreach ($newsList as $news) {
-                fputcsv($fh, [
-                    $dbName,
-                    $news['title'] ?? '',
-                    $news['text'] ?? '',
-                ]);
+                fputcsv($fh, [$dbName, $news['title'] ?? '', $news['text'] ?? '']);
             }
         }
         fclose($fh);
@@ -33,6 +30,7 @@ class ExportService extends Component
         $filename = 'export_' . date('Y-m-d_H-i-s') . '.txt';
         Yii::$app->response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
         Yii::$app->response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
         $out = fopen('php://output', 'w');
         foreach ($result as $dbName => $newsList) {
             fwrite($out, "Database: {$dbName}\n\n");
@@ -52,6 +50,7 @@ class ExportService extends Component
         $dir = Yii::getAlias('@webroot/exports');
         FileHelper::createDirectory($dir);
         $zipName = $dir . '/news_' . date('Ymd_His') . '.zip';
+
         $zip = new \ZipArchive();
         if ($zip->open($zipName, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             throw new \RuntimeException('Unable to create archive: ' . $zipName);
@@ -80,8 +79,8 @@ class ExportService extends Component
             foreach ($newsList as $news) {
                 $item = $xml->addChild('item');
                 $item->addChild('title', htmlspecialchars($news['title'] ?? '', ENT_XML1 | ENT_COMPAT, 'UTF-8'));
-                $item->addChild('text', htmlspecialchars($news['text'] ?? '', ENT_XML1 | ENT_COMPAT, 'UTF-8'));
-                $item->addChild('source', htmlspecialchars($dbName ?? '', ENT_XML1 | ENT_COMPAT, 'UTF-8'));
+                $item->addChild('text',  htmlspecialchars($news['text'] ?? '',  ENT_XML1 | ENT_COMPAT, 'UTF-8'));
+                $item->addChild('source', htmlspecialchars($dbName ?? '',        ENT_XML1 | ENT_COMPAT, 'UTF-8'));
             }
         }
         return $xml->asXML();

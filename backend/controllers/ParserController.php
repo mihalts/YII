@@ -5,43 +5,44 @@ namespace backend\controllers;
 use Yii;
 use yii\web\Controller;
 use yii\web\BadRequestHttpException;
+use yii\web\Response;
 use yii\helpers\FileHelper;
 use yii\helpers\ArrayHelper;
 
 class ParserController extends Controller
 {
+    /**
+     * Головна сторінка: показує список .sql з @storage/databases.
+     */
     public function actionIndex()
     {
         $databasePath = Yii::getAlias('@storage/databases');
         FileHelper::createDirectory($databasePath);
 
-        $files = FileHelper::findFiles($databasePath, [
-            'only' => ['*.sql']
-        ]);
-
-        $databases = ArrayHelper::map($files, function ($file) {
-            return basename($file);
-        }, function ($file) {
-            return basename($file);
-        });
+        $files = FileHelper::findFiles($databasePath, ['only' => ['*.sql']]);
+        $databases = ArrayHelper::map($files, static fn($f) => basename($f), static fn($f) => basename($f));
 
         return $this->render('index', [
             'databases' => $databases,
         ]);
     }
 
+    /**
+     * Завантаження .sql (POST).
+     */
     public function actionUpload()
     {
         if (!Yii::$app->request->isPost) {
             throw new BadRequestHttpException('POST required');
         }
-
         $ok = Yii::$app->parser->upload();
         Yii::$app->session->setFlash($ok ? 'success' : 'error', $ok ? 'Файл успішно завантажено.' : 'Помилка при збереженні файлу.');
-
         return $this->redirect(['index']);
     }
 
+    /**
+     * Видалення .sql.
+     */
     public function actionDelete(string $file)
     {
         $filename = basename($file);
@@ -49,7 +50,6 @@ class ParserController extends Controller
             Yii::$app->session->setFlash('error', 'Недопустиме розширення файлу.');
             return $this->redirect(['index']);
         }
-
         $path = Yii::getAlias('@storage/databases/' . $filename);
         if (is_file($path) && @unlink($path)) {
             Yii::$app->session->setFlash('success', "Файл видалено: {$filename}");
@@ -59,10 +59,37 @@ class ParserController extends Controller
         return $this->redirect(['index']);
     }
 
+    /**
+     * AJAX: повертає схему БД (таблиці+колонки) для селектів.
+     * Приймає ?db= або ?file= (db1.sql).
+     */
+    public function actionSchema(string $db = null, string $file = null): array
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+        $arg = $db ?: $file;
+        if (!$arg) return ['ok' => false, 'error' => 'missing param'];
+        $dbName = pathinfo($arg, PATHINFO_FILENAME);
+
+        try {
+            $schema = Yii::$app->parser->getSchema($dbName); // [['table'=>..., 'columns'=>[...]], ...]
+            return ['ok' => true, 'schema' => $schema];
+        } catch (\Throwable $e) {
+            Yii::error($e->getMessage(), __METHOD__);
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Експорт/перегляд результату.
+     * Кнопки у view передають name="action" (view/csv/txt/xml/xml-merge).
+     */
     public function actionExport()
     {
         $selected = Yii::$app->request->post('selectedDatabases', []);
-        $action = Yii::$app->request->post('action');
+        $action   = Yii::$app->request->post('action', Yii::$app->request->post('format')); // сумісність
+        $tables   = Yii::$app->request->post('table', []);
+        $titles   = Yii::$app->request->post('titleField', []);
+        $contents = Yii::$app->request->post('contentField', []);
 
         if (empty($selected)) {
             Yii::$app->session->setFlash('error', 'Не вибрано жодної бази даних.');
@@ -71,13 +98,18 @@ class ParserController extends Controller
 
         $result = [];
         foreach ($selected as $sqlFileName) {
-            $dbName = pathinfo($sqlFileName, PATHINFO_FILENAME);
-            $dbData = Yii::$app->parser->getNewsFromDatabase($dbName);
-            $result[$dbName] = $dbData;
+            $dbName  = pathinfo($sqlFileName, PATHINFO_FILENAME);
+            $mapping = [
+                'table'   => $tables[$sqlFileName]   ?? null,
+                'title'   => $titles[$sqlFileName]   ?? null,
+                'content' => $contents[$sqlFileName] ?? null,
+            ];
+            $result[$dbName] = Yii::$app->parser->getNewsFromDatabaseWithMap($dbName, $mapping);
         }
 
         switch ($action) {
             case 'view':
+            case 'preview':
                 return $this->render('preview', ['result' => $result]);
 
             case 'csv':
@@ -102,5 +134,6 @@ class ParserController extends Controller
         }
 
         Yii::$app->end();
+        return null;
     }
 }
