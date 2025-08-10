@@ -55,8 +55,8 @@ $this->title = 'Експорт новин із баз даних';
         <?= Html::submitButton('Перегляд', ['class' => 'btn btn-info', 'name' => 'action', 'value' => 'view']) ?>
         <?= Html::submitButton('Експортувати у CSV', ['class' => 'btn btn-success', 'name' => 'action', 'value' => 'csv']) ?>
         <?= Html::submitButton('Експортувати у TXT', ['class' => 'btn btn-primary', 'name' => 'action', 'value' => 'txt']) ?>
-        <?= Html::submitButton('Export to XML', ['name' => 'action', 'value' => 'xml', 'class' => 'btn btn-outline-secondary']) ?>
-        <?= Html::submitButton('Export to XML (merge)', ['name' => 'action', 'value' => 'xml-merge', 'class' => 'btn btn-outline-warning']) ?>
+        <?= Html::submitButton('Експортувати у XML', ['class' => 'btn btn-outline-secondary', 'name' => 'action', 'value' => 'xml']) ?>
+        <?= Html::submitButton('Експортувати у XML (об’єднати)', ['class' => 'btn btn-outline-warning', 'name' => 'action', 'value' => 'xml-merge']) ?>
     </div>
 
     <?php ActiveForm::end(); ?>
@@ -80,3 +80,21 @@ $this->title = 'Експорт новин із баз даних';
 </div>
 
 <?php ActiveForm::end(); ?>
+
+<hr>
+<h3>Завантаження готових архівів</h3>
+<?php
+$exportsDir = Yii::getAlias('@webroot/exports');
+\yii\helpers\FileHelper::createDirectory($exportsDir);
+$exportFiles = glob($exportsDir . '/*.zip');
+if ($exportFiles):
+    echo '<ul>';
+    foreach ($exportFiles as $file) {
+        $base = basename($file);
+        echo '<li>' . \yii\helpers\Html::a($base, '@web/exports/' . $base, ['target' => '_blank']) . '</li>';
+    }
+    echo '</ul>';
+else:
+    echo '<p>Поки що немає збережених архівів.</p>';
+endif;
+?>

@@ -41,7 +41,7 @@ return [
             'class' => 'backend\components\ParserComponent',
         ],
         'export' => [
-            'class' => 'backend\components\ExportComponent',
+            'class' => 'backend\components\ExportService',
         ],
         'cache' => [
             'class' => 'yii\caching\FileCache',
