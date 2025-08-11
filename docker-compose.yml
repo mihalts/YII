@@ -1,31 +1,32 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  app:
+  yii2-app:
+    container_name: yii2-app
     build:
       context: .
-    container_name: yii2-app
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/var/www/html
     ports:
       - "8080:80"
-    volumes:
-      - .:/var/www/html
     depends_on:
-      - db
+      - yii2-db
+    environment:
+      DB_HOST: yii2-db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASS: root
 
-  db:
-    image: mysql:5.7
+  yii2-db:
     container_name: yii2-db
-    restart: always
+    image: mysql:5.7
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: yii2advanced
-      MYSQL_USER: yii2advanced
-      MYSQL_PASSWORD: secret
     ports:
       - "3306:3306"
     volumes:
-      - db_data:/var/lib/mysql
-      - ./storage/databases:/app/storage/mysql-dumps
+      - mysql_data:/var/lib/mysql
 
 volumes:
-  db_data:
+  mysql_data:
