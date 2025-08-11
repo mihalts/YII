@@ -81,14 +81,14 @@ environments/            contains environment-based overrides
 
 ## 2. Завантаження проєкту
 
-### З GitHub:
+### З GitHub: гілка test
 ```bash
-git clone https://github.com/mihalts/YII.git
+git clone https://github.com/mihalts/YII.git 
 cd YII
 ```
 
 ### З архіву:
-[ Завантажити з Google Drive](https://drive.google.com/file/d/1111ifbqWJ0YqhNtD1vA29mJy4AT6qunp/view?usp=drive_link)  
+[ Завантажити з Google Drive](https://drive.google.com/file/d/1O-Qcs15LvNPjVAgMsKdFOXxmsdx3HTxy/view?usp=sharing)  
 ```bash
 unzip YII-main.zip -d ~/projects/YII
 cd ~/projects/YII
