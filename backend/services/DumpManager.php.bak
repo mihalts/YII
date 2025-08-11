@@ -1,0 +1,44 @@
+<?php
+
+namespace backend\services;
+
+use yii\web\UploadedFile;
+use backend\repositories\DumpRepository;
+use Yii;
+
+class DumpManager
+{
+    private DumpRepository $repo;
+
+    public function __construct(DumpRepository $repo = null)
+    {
+        $this->repo = $repo ?? new DumpRepository();
+    }
+
+    /** Повертає true/false; валідація: тільки .sql, унікальна назва */
+    public function handleUpload(string $fieldName): bool
+    {
+        $file = UploadedFile::getInstanceByName($fieldName);
+        if (!$file || strtolower($file->extension) !== 'sql') {
+            return false;
+        }
+
+        $target = $this->repo->path($file->name);
+        if (file_exists($target)) {
+            $pi = pathinfo($file->name);
+            $target = $this->repo->path($pi['filename'] . '_' . date('Ymd_His') . '.sql');
+        }
+
+        \yii\helpers\FileHelper::createDirectory(dirname($target));
+        $ok = $file->saveAs($target);
+
+        if ($ok) {
+            // опційно — очистити кеш саме для цієї БД (якщо використовуєш префіксну політику)
+            $base = pathinfo(basename($target), PATHINFO_FILENAME);
+            // Якщо маєш Cache з keyPrefix — тут можна пройтись і видалити патерн news_{$base}_*
+            // На FileCache простіше не чіпати — нова назва БД дасть новий ключ.
+        }
+
+        return $ok;
+    }
+}

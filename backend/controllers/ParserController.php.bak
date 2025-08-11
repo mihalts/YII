@@ -34,7 +34,7 @@ class ParserController extends Controller
         $manager = Yii::$container->get(DumpManager::class);
 
         if ($manager->handleUpload('sqlFile')) {
-            Yii::$app->session->setFlash('success', 'Файл завантажено.');
+            Yii::$app->session->setFlash('success', 'Файл завантажено. Натисніть «Повернути селекти», щоб підвантажити схему.');
         } else {
             Yii::$app->session->setFlash('error', 'Не вдалося завантажити файл.');
         }
@@ -54,6 +54,7 @@ class ParserController extends Controller
         return $this->redirect(['index']);
     }
 
+    /** AJAX: повернути схему БД (для селектів) */
     public function actionSchema(string $db = null, string $file = null): array
     {
         Yii::$app->response->format = Response::FORMAT_JSON;
@@ -98,7 +99,21 @@ class ParserController extends Controller
                 'title'   => $titles[$sqlFile]   ?? null,
                 'content' => $contents[$sqlFile] ?? null,
             ];
-            $result[$db] = $extractor->getNews($db, $mapping);
+
+            try {
+                $data = $extractor->getNews($db, $mapping);
+                if (empty($data)) {
+                    Yii::$app->session->setFlash(
+                        'warning',
+                        "БД {$db}: немає даних. Перевірте таблицю/поля або натисніть «Повернути селекти» і оберіть зі списку."
+                    );
+                }
+                $result[$db] = $data;
+            } catch (\Throwable $e) {
+                Yii::error("Export error for {$db}: ".$e->getMessage(), __METHOD__);
+                Yii::$app->session->setFlash('error', "БД {$db}: " . $e->getMessage());
+                $result[$db] = [];
+            }
         }
 
         if ($action === 'view' || $action === 'preview') {

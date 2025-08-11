@@ -1,0 +1,159 @@
+<?php
+
+namespace backend\services;
+
+use PDO;
+use Yii;
+use backend\services\Schema\SchemaInspector;
+use backend\services\Sanitizer\HtmlSanitizer;
+
+class NewsExtractionService
+{
+    /** Параметри підключення до MySQL (за замовчуванням для docker-compose) */
+    public string $dbUser = 'root';
+    public string $dbPass = 'root';
+    public string $dbHost = 'db';
+    public string $dbPort = '3306';
+
+    private int $cacheTtl = 300;
+
+    private SchemaInspector $inspector;
+    private HtmlSanitizer $sanitizer;
+
+    public function __construct(SchemaInspector $inspector = null, HtmlSanitizer $sanitizer = null)
+    {
+        $this->inspector = $inspector ?? new SchemaInspector();
+        $this->sanitizer = $sanitizer ?? new HtmlSanitizer();
+    }
+
+    /** Схема БД: для автопідстановки селектів у формі */
+    public function getSchema(string $dbName): array
+    {
+        $this->ensureImported($dbName);
+        $pdo = $this->pdo($dbName);
+        return $this->inspector->get($pdo);
+    }
+
+    /** Основна вибірка новин; повертає [['title'=>..., 'text'=>...], ...] */
+    public function getNews(string $dbName, array $map): array
+    {
+        $cacheKey = "news_{$dbName}_" . md5(json_encode($map));
+        $cache = Yii::$app->cache;
+
+        if (($cached = $cache->get($cacheKey)) !== false) {
+            return $cached;
+        }
+
+        $this->ensureImported($dbName);
+        $pdo = $this->pdo($dbName);
+
+        $table = $map['table']   ?? null;
+        $title = $map['title']   ?? 'title';
+        $text  = $map['content'] ?? 'content';
+
+        if (!$table) {
+            $table = $this->autoFindTable($pdo);
+            if (!$table) {
+                return [];
+            }
+        }
+
+        // “знешкодимо” бектики, щоб не ламали SQL і не спричиняли ін’єкцій
+        $qTable = str_replace('`', '', $table);
+        $qTitle = str_replace('`', '', $title);
+        $qText  = str_replace('`', '', $text);
+
+        // Валідація: чи існують таблиця та колонки
+        $check = $this->validateMapping($pdo, $qTable, $qTitle, $qText);
+        if (!$check['ok']) {
+            Yii::warning("Bad mapping for DB {$dbName}: " . implode(' ', $check['errors']), __METHOD__);
+            return [];
+        }
+
+        $sql  = "SELECT `{$qTitle}` AS title, `{$qText}` AS content FROM `{$qTable}`";
+        $stmt = $pdo->query($sql);
+
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $out[] = [
+                'title' => $this->sanitizer->clean($row['title'] ?? ''),
+                'text'  => $this->sanitizer->clean($row['content'] ?? ''),
+            ];
+        }
+
+        $cache->set($cacheKey, $out, $this->cacheTtl);
+        return $out;
+    }
+
+    /** Спроба знайти таблицю з колонками title+content */
+    private function autoFindTable(PDO $pdo): ?string
+    {
+        $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        foreach ($tables as $t) {
+            $cols = $pdo->query("SHOW COLUMNS FROM `{$t}`")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            if (in_array('title', $cols, true) && in_array('content', $cols, true)) {
+                return $t;
+            }
+        }
+        return null;
+    }
+
+    /** Валідація наявності таблиці й колонок */
+    private function validateMapping(PDO $pdo, string $table, string $title, string $text): array
+    {
+        $errors = [];
+
+        $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (!in_array($table, $tables, true)) {
+            $errors[] = "Таблиця `{$table}` не існує.";
+            return ['ok' => false, 'errors' => $errors];
+        }
+
+        $cols = $pdo->query("SHOW COLUMNS FROM `{$table}`")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (!in_array($title, $cols, true)) { $errors[] = "Колонка назви `{$title}` відсутня у `{$table}`."; }
+        if (!in_array($text,  $cols, true)) { $errors[] = "Колонка тексту `{$text}` відсутня у `{$table}`."; }
+
+        return ['ok' => empty($errors), 'errors' => $errors];
+    }
+
+    /** Повертає PDO підключення до конкретної БД */
+    private function pdo(string $dbName): PDO
+    {
+        $pdo = new PDO("mysql:host={$this->dbHost};port={$this->dbPort};dbname={$dbName}", $this->dbUser, $this->dbPass);
+        $pdo->exec("SET NAMES utf8mb4");
+        return $pdo;
+    }
+
+    /** Імпорт .sql у БД, якщо вона відсутня */
+    private function ensureImported(string $dbName): void
+    {
+        $pdo = new PDO("mysql:host={$this->dbHost};port={$this->dbPort}", $this->dbUser, $this->dbPass);
+        if ($pdo->query("SHOW DATABASES LIKE '{$dbName}'")->fetch()) {
+            return;
+        }
+
+        $sqlPath = Yii::getAlias("@storage/databases/{$dbName}.sql");
+        if (!is_file($sqlPath)) {
+            throw new \RuntimeException("SQL-файл не знайдено: {$sqlPath}");
+        }
+
+        // збираємо stderr, щоб бачити причину у логах
+        $cmd = sprintf(
+            'mysql -h%s -P%s -u%s -p%s -e "CREATE DATABASE IF NOT EXISTS `%s`;" 2>&1'
+            . ' && mysql -h%s -P%s -u%s -p%s `%s` < %s 2>&1',
+            escapeshellarg($this->dbHost), escapeshellarg($this->dbPort),
+            escapeshellarg($this->dbUser), escapeshellarg($this->dbPass), escapeshellarg($dbName),
+            escapeshellarg($this->dbHost), escapeshellarg($this->dbPort),
+            escapeshellarg($this->dbUser), escapeshellarg($this->dbPass),
+            escapeshellarg($dbName), escapeshellarg($sqlPath)
+        );
+
+        $out = [];
+        exec($cmd, $out, $code);
+
+        if ($code !== 0) {
+            Yii::error("SQL import failed\nCMD: {$cmd}\nOUT:\n" . implode("\n", $out), __METHOD__);
+            throw new \RuntimeException("Помилка імпорту SQL: {$sqlPath}. Деталі у логах.");
+        }
+    }
+}
