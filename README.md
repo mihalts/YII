@@ -80,7 +80,20 @@ environments/            contains environment-based overrides
 ---
 
 ## 2. Завантаження проєкту
+## Quick Start
+1. git clone <repo> && cd <repo>
+2. cp .env.example .env
+3. docker compose up -d --build
+4. Відкрий http://localhost:8080
+   - Парсер: /parser або /index.php?r=parser/index
+5. Дампи .sql клади в storage/databases або імпортуй через UI.
+6. Експорти шукай у backend/web/exports.
 
+### Додатково
+- Адмінер: http://localhost:8081 (host: yii2-db, user: root, pass: з .env)
+- Зупинка: docker compose down
+
+##АБО
 ### З GitHub: гілка test
 ```bash
 git clone https://github.com/mihalts/YII.git 

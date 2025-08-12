@@ -1,30 +1,31 @@
-version: "3.8"
-
 services:
   yii2-app:
     build:
       context: .
       dockerfile: Dockerfile
-    volumes:
-      - ./:/var/www/html
     ports:
-      - "8080:80"
+      - "${APP_PORT:-8080}:80"
+    env_file: .env
     depends_on:
       - yii2-db
-    environment:
-      DB_HOST: yii2-db
-      DB_PORT: "3306"
-      DB_USER: root
-      DB_PASS: root
+    volumes:
+      - ./:/var/www/html
 
   yii2-db:
     image: mysql:5.7
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-yii2advanced}
     ports:
-      - "3306:3306"
+      - "${DB_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    depends_on: [yii2-db]
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
 
 volumes:
   mysql_data:
