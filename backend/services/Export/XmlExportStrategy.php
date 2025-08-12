@@ -1,55 +1,43 @@
 <?php
-
 namespace backend\services\Export;
 
 use Yii;
-use yii\helpers\FileHelper;
+use yii\web\Response;
 
 class XmlExportStrategy implements ExportStrategyInterface
 {
-    private bool $merge;
+    public function __construct(private bool $pretty = true) {}
 
-    public function __construct(bool $merge = false)
+    public function output(array $result, ?string $filename = null): Response
     {
-        $this->merge = $merge;
-    }
+        $filename = $filename ?: 'export_' . date('Y-m-d_H-i-s') . '.xml';
 
-    public function output(array $result): void
-    {
-        $dir = Yii::getAlias('@webroot/exports');
-        FileHelper::createDirectory($dir);
-        $zipName = $dir . '/news_' . date('Ymd_His') . '.zip';
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->formatOutput = $this->pretty;
 
-        $zip = new \ZipArchive();
-        if ($zip->open($zipName, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            throw new \RuntimeException('Unable to create archive: ' . $zipName);
-        }
+        $root = $dom->createElement('items');
+        $dom->appendChild($root);
 
-        if ($this->merge) {
-            $xml = $this->buildXml($result);
-            $zip->addFromString('merged.xml', $xml);
-        } else {
-            foreach ($result as $db => $items) {
-                $xml = $this->buildXml([$db => $items]);
-                $zip->addFromString($db . '.xml', $xml);
-            }
-        }
-        $zip->close();
-
-        Yii::$app->response->sendFile($zipName)->send();
-    }
-
-    private function buildXml(array $data): string
-    {
-        $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><news></news>');
-        foreach ($data as $db => $items) {
+        foreach ($result as $db => $items) {
             foreach ($items as $row) {
-                $item = $xml->addChild('item');
-                $item->addChild('title', htmlspecialchars($row['title'] ?? '', ENT_XML1 | ENT_COMPAT, 'UTF-8'));
-                $item->addChild('text',  htmlspecialchars($row['text'] ?? '',  ENT_XML1 | ENT_COMPAT, 'UTF-8'));
-                $item->addChild('source', htmlspecialchars($db, ENT_XML1 | ENT_COMPAT, 'UTF-8'));
+                $item = $dom->createElement('item');
+
+                $item->appendChild($dom->createElement('database', $db));
+                $item->appendChild($dom->createElement('title',   (string)($row['title'] ?? '')));
+                $item->appendChild($dom->createElement('text',    (string)($row['content'] ?? ($row['text'] ?? ''))));
+
+                $root->appendChild($item);
             }
         }
-        return $xml->asXML();
+
+        $xml = $dom->saveXML();
+
+        if (ob_get_length()) { @ob_end_clean(); }
+
+        return Yii::$app->response->sendContentAsFile(
+            $xml,
+            $filename,
+            ['mimeType' => 'application/xml; charset=UTF-8', 'inline' => false]
+        );
     }
 }

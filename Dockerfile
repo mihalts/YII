@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install pdo pdo_mysql pdo_sqlite zip
 
 RUN a2enmod rewrite
+COPY apache/000-default.conf /etc/apache2/sites-available/000-default.conf
 
 COPY . /var/www/html
 WORKDIR /var/www/html

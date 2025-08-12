@@ -1,5 +1,4 @@
 <?php
-
 namespace backend\controllers;
 
 use Yii;
@@ -13,18 +12,16 @@ use backend\repositories\DumpRepository;
 
 class ParserController extends Controller
 {
-    public function actionIndex()
+    public function actionIndex(): string
     {
         /** @var DumpRepository $repo */
-        $repo = Yii::$container->get(DumpRepository::class);
+        $repo  = Yii::$container->get(DumpRepository::class);
         $dumps = $repo->list();
 
-        return $this->render('index', [
-            'databases' => $dumps,
-        ]);
+        return $this->render('index', ['databases' => $dumps]);
     }
 
-    public function actionUpload()
+    public function actionUpload(): Response
     {
         if (!Yii::$app->request->isPost) {
             throw new BadRequestHttpException('POST required');
@@ -41,7 +38,7 @@ class ParserController extends Controller
         return $this->redirect(['index']);
     }
 
-    public function actionDelete(string $file)
+    public function actionDelete(string $file): Response
     {
         /** @var DumpRepository $repo */
         $repo = Yii::$container->get(DumpRepository::class);
@@ -74,7 +71,8 @@ class ParserController extends Controller
         }
     }
 
-    public function actionExport()
+    /** Показ прев’ю або віддача файлу експорту */
+    public function actionExport(): Response|string
     {
         $selected = Yii::$app->request->post('selectedDatabases', []);
         $action   = Yii::$app->request->post('action', Yii::$app->request->post('format'));
@@ -98,25 +96,22 @@ class ParserController extends Controller
                 'title'   => $titles[$sqlFile]   ?? null,
                 'content' => $contents[$sqlFile] ?? null,
             ];
-            $result[$db] = $extractor->getNews($db, $mapping);
+            $result[$db] = $extractor->getNews($db, $mapping) ?? [];
         }
 
         if ($action === 'view' || $action === 'preview') {
-            return $this->render('preview', ['result' => $result]);
+            return $this->render('preview', ['result' => $result]); // string
         }
 
         /** @var ExportService $export */
         $export = Yii::$container->get(ExportService::class);
-        switch ($action) {
-            case 'csv':       $export->asCsv($result); break;
-            case 'txt':       $export->asTxt($result); break;
-            case 'xml':       $export->asXml($result, false); break;
-            case 'xml-merge': $export->asXml($result, true); break;
-            default:
-                Yii::$app->session->setFlash('error', 'Невідома дія.');
-                return $this->redirect(['index']);
-        }
-        Yii::$app->end();
-        return null;
+
+        return match ($action) {
+            'csv'       => $export->asCsv($result),
+            'txt'       => $export->asTxt($result),
+            'xml'       => $export->asXml($result, false),
+            'xml-merge' => $export->asXml($result, true),
+            default     => $this->redirect(['index']),
+        };
     }
 }

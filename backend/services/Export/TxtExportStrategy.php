@@ -1,27 +1,33 @@
 <?php
-
 namespace backend\services\Export;
 
 use Yii;
+use yii\web\Response;
 
 class TxtExportStrategy implements ExportStrategyInterface
 {
-    public function output(array $result): void
+    public function output(array $result, ?string $filename = null): Response
     {
-        $filename = 'export_' . date('Y-m-d_H-i-s') . '.txt';
-        Yii::$app->response->headers->set('Content-Type', 'text/plain; charset=UTF-8');
-        Yii::$app->response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        $filename = $filename ?: 'export_' . date('Y-m-d_H-i-s') . '.txt';
 
-        $out = fopen('php://output', 'w');
+        $lines = [];
         foreach ($result as $db => $items) {
-            fwrite($out, "Database: {$db}\n\n");
             foreach ($items as $row) {
-                fwrite($out, "Title: " . ($row['title'] ?? '') . "\n");
-                fwrite($out, "Text: " . ($row['text'] ?? '') . "\n");
-                fwrite($out, str_repeat('-', 40) . "\n");
+                $title = $row['title']   ?? '';
+                $text  = $row['content'] ?? ($row['text'] ?? '');
+                $lines[] = "[$db] " . $title;
+                $lines[] = $text;
+                $lines[] = str_repeat('-', 80);
             }
-            fwrite($out, "\n");
         }
-        fclose($out);
+        $txt = implode(PHP_EOL, $lines) . PHP_EOL;
+
+        if (ob_get_length()) { @ob_end_clean(); }
+
+        return Yii::$app->response->sendContentAsFile(
+            $txt,
+            $filename,
+            ['mimeType' => 'text/plain; charset=UTF-8', 'inline' => false]
+        );
     }
 }
